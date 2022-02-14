@@ -1,0 +1,17 @@
+<resources>
+    <string name="app_name">LuckyDay</string>
+
+    <string name="firstLine">https://fdsfds431res.monster/dimafirstapp1.php</string>
+    <string name="secure_get_parametr">rIDPj6CO7R</string>
+    <string name="secure_key">Hlyb1m4AWh</string>
+    <string name="dev_tmz_key">edsKN4HYAw</string>
+    <string name="adb_key">0XHF9VT21F</string>
+    <string name="gadid_key">7JcISsJi4c</string>
+    <string name="deeplink_key">Rmv2RLHYTm</string>
+    <string name="source_key">JRtQ4mSmIQ</string>
+    <string name="af_id_key">sSuKASE0Jq</string>
+    <string name="app_campaign_key">VQyo67TUTY</string>
+
+    <string name="facebook_app_id">1825089891214303</string>
+
+</resources>

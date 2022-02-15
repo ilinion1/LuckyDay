@@ -18,7 +18,6 @@ import com.appsflyer.AppsFlyerLib
 import com.facebook.applinks.AppLinkData
 import com.facebook.FacebookSdk.fullyInitialize
 import com.facebook.FacebookSdk.setAutoInitEnabled
-import com.gerija.vehy.MyApplication.Companion.conversionLiveData
 import com.gerija.vehy.databinding.ActivityMainBinding
 import com.google.android.gms.ads.identifier.AdvertisingIdClient
 import kotlinx.coroutines.Dispatchers
@@ -96,13 +95,12 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onConversionDataFail(error: String?) {
-
-                conversionLiveData.postValue(mutableMapOf())
-
+                source = null
+                campaignKey = null
             }
 
             override fun onAppOpenAttribution(data: MutableMap<String, String>?) {
-                //   conversionLiveData.postValue(mutableMapOf())
+                Log.d("onAttributionFailure", "$data")
             }
 
             override fun onAttributionFailure(error: String?) {

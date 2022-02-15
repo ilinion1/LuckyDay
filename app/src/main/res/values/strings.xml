@@ -14,4 +14,7 @@
 
     <string name="facebook_app_id">1825089891214303</string>
 
+    <string name="lack">Испытать удачу</string>
+    <string name="count">Счетчик побед:</string>
+
 </resources>

@@ -2,22 +2,26 @@ package com.gerija.vehy
 
 import android.animation.ObjectAnimator
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.webkit.WebResourceRequest
+import android.os.Handler
+import android.util.Log
+import android.view.View
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.lifecycle.lifecycleScope
+import com.appsflyer.AppsFlyerConversionListener
 import com.appsflyer.AppsFlyerLib
 import com.facebook.applinks.AppLinkData
 import com.facebook.FacebookSdk.fullyInitialize
 import com.facebook.FacebookSdk.setAutoInitEnabled
+import com.gerija.vehy.MyApplication.Companion.conversionLiveData
 import com.gerija.vehy.databinding.ActivityMainBinding
 import com.google.android.gms.ads.identifier.AdvertisingIdClient
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.*
@@ -26,8 +30,9 @@ import java.util.*
 class MainActivity : AppCompatActivity() {
 
     lateinit var binding: ActivityMainBinding
+    private val keyDevAppsflyer = "s2uD2SPSCbdWE7ERtTu9y3"
 
-    lateinit var webView: WebView
+    //private var webView: WebView? = null
     private var firstLine = ""
     private var secureGetParametr = ""
     private var secureKey = ""
@@ -53,44 +58,77 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        startActionBar()
+        AppsFlyerLib.getInstance().init(keyDevAppsflyer, appsFlyerConversion(), this)
+        AppsFlyerLib.getInstance().start(this)
+
         startInitialFb()
-        getAppsFlyerParams()
-        setAppSetting()
+        Log.d("Log", "1")
+        //setAppSetting()
     }
 
-    private fun setAppSetting(){
+    private fun setAppSetting() {
         devTmz = TimeZone.getDefault().id
         adb = 0 != applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE
         lifecycleScope.launch(Dispatchers.IO) {
-            val googleId= AdvertisingIdClient.getAdvertisingIdInfo(applicationContext)
+            val googleId = AdvertisingIdClient.getAdvertisingIdInfo(applicationContext)
             gadid = googleId.id.toString()
-            withContext(Dispatchers.Main){
-                startWebView(combineLink())
+            withContext(Dispatchers.Main) {
+                setString()
+                startWebView()
             }
         }
     }
 
 
+    /**
+     * Обрабатываю данные о конверсиях
+     */
+    private fun appsFlyerConversion(): AppsFlyerConversionListener {
+        afId = AppsFlyerLib.getInstance().getAppsFlyerUID(this)
 
-    private fun setString(){
-         firstLine = getString(R.string.firstLine)
-         secureGetParametr = getString(R.string.secure_get_parametr)
-         secureKey = getString(R.string.secure_key)
-         devTmzKey = getString(R.string.dev_tmz_key)
-         adbKey = getString(R.string.adb_key)
-         gadidKey = getString(R.string.gadid_key)
-         deeplinkKey = getString(R.string.deeplink_key)
-         sourceKey = getString(R.string.source_key)
-         afIdKey = getString(R.string.af_id_key)
-         appCampaignKey = getString(R.string.app_campaign_key)
+        return object : AppsFlyerConversionListener {
+            override fun onConversionDataSuccess(data: MutableMap<String, Any>?) {
+
+                data?.let {
+                    getAppsFlyerParams(it)
+
+                }
+            }
+
+            override fun onConversionDataFail(error: String?) {
+
+                conversionLiveData.postValue(mutableMapOf())
+
+            }
+
+            override fun onAppOpenAttribution(data: MutableMap<String, String>?) {
+                //   conversionLiveData.postValue(mutableMapOf())
+            }
+
+            override fun onAttributionFailure(error: String?) {
+                Log.d("onAttributionFailure", "$error")
+                //   conversionLiveData.postValue(mutableMapOf())
+            }
+
+        }
     }
+
 
     /**
      * Собираю ссылку
      */
-    private fun combineLink(): String{
-        setString()
+    private fun setString() {
+        firstLine = getString(R.string.firstLine)
+        secureGetParametr = getString(R.string.secure_get_parametr)
+        secureKey = getString(R.string.secure_key)
+        devTmzKey = getString(R.string.dev_tmz_key)
+        adbKey = getString(R.string.adb_key)
+        gadidKey = getString(R.string.gadid_key)
+        deeplinkKey = getString(R.string.deeplink_key)
+        sourceKey = getString(R.string.source_key)
+        afIdKey = getString(R.string.af_id_key)
+        appCampaignKey = getString(R.string.app_campaign_key)
+
         fullLink = firstLine +
                 "?$secureGetParametr=$secureKey" +
                 "&$devTmzKey=$devTmz" +
@@ -101,13 +139,12 @@ class MainActivity : AppCompatActivity() {
                 "&$appCampaignKey=$source" +
                 "&$afIdKey=$afId"
 
-        return fullLink
     }
 
     /**
      * Инициализирую фейсбук
      */
-    private fun startInitialFb(){
+    private fun startInitialFb() {
         setAutoInitEnabled(true)
         fullyInitialize()
         AppLinkData.fetchDeferredAppLinkData(
@@ -119,58 +156,66 @@ class MainActivity : AppCompatActivity() {
 
 
     /**
-     * Запускаю прогресс бар
-     */
-    private fun startActionBar(){
-        binding.progressBarId.max = 100
-        val currencyProgress = 100
-
-        ObjectAnimator.ofInt(binding.progressBarId,"progress",currencyProgress)
-            .setDuration(3000).start()
-    }
-
-    /**
      * Получаю параметры с AppsFlyer
      */
-    private fun getAppsFlyerParams(){
-        afId = AppsFlyerLib.getInstance().getAppsFlyerUID(this)
-        MyApplication.conversionLiveData.observe(this){ data ->
-            for (it in data){
-                if(it.key == "media_source"){
-                    source = it.value.toString()
-                }
-                if (it.key == "campaign"){
-                    campaignKey = it.value.toString()
-                }
+    private fun getAppsFlyerParams(data: MutableMap<String, Any>) {
+        for (inform in data) {
+            if (inform.key == "media_source") {
+                source = inform.value.toString()
+                Log.d("Log", "$source")
+            }
+            if (inform.key == "campaign") {
+                campaignKey = inform.value.toString()
+                Log.d("Log", "$campaignKey")
             }
         }
+        setAppSetting()
     }
+
 
     /**
      * запускаю webView
      */
     @SuppressLint("SetJavaScriptEnabled")
-    private fun startWebView(link: String){
-        webView.webViewClient = WebViewClient()
-        webView.settings.javaScriptEnabled = true
-        webView.loadUrl(link)
-    }
+    private fun startWebView() {
+        binding.webViewId.loadUrl(fullLink)
+        binding.webViewId.settings.javaScriptEnabled = true
 
-    private inner class LocalClient: WebViewClient(){
-        val localHost = "http://localhost/"
+        val linkBot = getSharedPreferences("link", Context.MODE_PRIVATE)
+        val localBot = linkBot.getBoolean("local", false)
 
-        override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean{
-            return super.shouldOverrideUrlLoading(view, request)
-            val url = request?.url.toString()
-            if(request?.url.toString() != localHost){
+        val user = getSharedPreferences("hasVisited", Context.MODE_PRIVATE)
+        val visited = user.getBoolean("hasVisited", false)
 
+        if (!visited) {
+            user.edit().putBoolean("hasVisited", true).apply()
+            binding.webViewId.webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    if (url == "http://localhost/") {
+                        linkBot.edit().putBoolean("local", true).apply()
+                        startActivity(Intent(this@MainActivity, GameActivity::class.java))
+                    } else {
+                        binding.webViewId.visibility = View.VISIBLE
+                    }
+                }
             }
-            if (url == localHost){
+        } else {
+            if (localBot) {
                 startActivity(Intent(this@MainActivity, GameActivity::class.java))
-                finish()
+            } else {
+                binding.webViewId.webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        binding.webViewId.visibility = View.VISIBLE
+                    }
+                }
             }
-            return false
         }
-
     }
+
+    override fun onBackPressed() {
+        if (binding.webViewId.canGoBack()) {
+            binding.webViewId.goBack()
+        } else super.onBackPressed()
+    }
+
 }

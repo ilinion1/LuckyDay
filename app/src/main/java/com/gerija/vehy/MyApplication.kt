@@ -1,11 +1,13 @@
 package com.gerija.vehy
 
 import android.app.Application
+import android.os.Handler
 import android.util.Log
 import androidx.lifecycle.MutableLiveData
 import com.appsflyer.AppsFlyerConversionListener
 import com.appsflyer.AppsFlyerLib
 import com.onesignal.OneSignal
+import kotlinx.coroutines.delay
 
 class MyApplication: Application() {
 
@@ -16,36 +18,52 @@ class MyApplication: Application() {
         var conversionLiveData = MutableLiveData<MutableMap<String, Any>>()
     }
 
+    private var dataSeted = false
+
 
     override fun onCreate() {
         super.onCreate()
-        AppsFlyerLib.getInstance().init(keyDevAppsflyer, appsFlyerConversion(), this)
-        AppsFlyerLib.getInstance().start(this)
+//        AppsFlyerLib.getInstance().init(keyDevAppsflyer, appsFlyerConversion(), this)
+//        AppsFlyerLib.getInstance().start(this)
 
         OneSignal.initWithContext(this)
         OneSignal.setAppId(oneSignalAppId)
     }
 
-    /**
-     * Обрабатываю данные о конверсиях
-     */
-    private fun appsFlyerConversion(): AppsFlyerConversionListener{
-        return object : AppsFlyerConversionListener{
-            override fun onConversionDataSuccess(data: MutableMap<String, Any>?) {
-                Log.d("onConversionDataSuccess", data.toString())
-                conversionLiveData.postValue(data)
-            }
-
-            override fun onConversionDataFail(error: String?) {
-                Log.d("onConversionDataFail", "$error")
-            }
-
-            override fun onAppOpenAttribution(data: MutableMap<String, String>?) {}
-
-            override fun onAttributionFailure(error: String?) {
-                Log.d("onAttributionFailure", "$error")
-            }
-
-        }
-    }
+//    /**
+//     * Обрабатываю данные о конверсиях
+//     */
+//    private fun appsFlyerConversion(): AppsFlyerConversionListener{
+//
+//        return object : AppsFlyerConversionListener{
+//            override fun onConversionDataSuccess(data: MutableMap<String, Any>?) {
+//                Log.d("onConversion", data.toString())
+//                data?.let {
+//                    if (!dataSeted) {
+//                        dataSeted = true
+//                        conversionLiveData.postValue(it)
+//                    }
+//                }
+//                Log.d("onConversionDataSuccess", data.toString())
+//               // conversionLiveData.postValue("test")
+//            }
+//
+//            override fun onConversionDataFail(error: String?) {
+//                if (!dataSeted) {
+//                    dataSeted = true
+//                    conversionLiveData.postValue(mutableMapOf())
+//                }
+//            }
+//
+//            override fun onAppOpenAttribution(data: MutableMap<String, String>?) {
+//             //   conversionLiveData.postValue(mutableMapOf())
+//            }
+//
+//            override fun onAttributionFailure(error: String?) {
+//                Log.d("onAttributionFailure", "$error")
+//             //   conversionLiveData.postValue(mutableMapOf())
+//            }
+//
+//        }
+//    }
 }

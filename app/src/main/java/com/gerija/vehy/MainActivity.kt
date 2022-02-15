@@ -59,10 +59,8 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
         AppsFlyerLib.getInstance().init(keyDevAppsflyer, appsFlyerConversion(), this)
         AppsFlyerLib.getInstance().start(this)
-
         startInitialFb()
-        Log.d("Log", "1")
-        //setAppSetting()
+
     }
 
     private fun setAppSetting() {

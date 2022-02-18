@@ -1,23 +1,24 @@
 package com.gerija.vehy
 
-import android.animation.ObjectAnimator
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
-import androidx.appcompat.app.AppCompatActivity
+import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
+import android.os.Message
 import android.util.Log
 import android.view.View
-import android.webkit.WebView
-import android.webkit.WebViewClient
+import android.webkit.*
+import android.webkit.WebSettings.LOAD_DEFAULT
+import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.appsflyer.AppsFlyerConversionListener
 import com.appsflyer.AppsFlyerLib
-import com.facebook.applinks.AppLinkData
 import com.facebook.FacebookSdk.fullyInitialize
 import com.facebook.FacebookSdk.setAutoInitEnabled
+import com.facebook.applinks.AppLinkData
 import com.gerija.vehy.databinding.ActivityMainBinding
 import com.google.android.gms.ads.identifier.AdvertisingIdClient
 import kotlinx.coroutines.Dispatchers
@@ -132,7 +133,7 @@ class MainActivity : AppCompatActivity() {
                 "&$gadidKey=$gadid" +
                 "&$deeplinkKey=$deeplink" +
                 "&$sourceKey=$source" +
-                "&$appCampaignKey=$source" +
+                "&$appCampaignKey=$campaignKey" +
                 "&$afIdKey=$afId"
 
     }
@@ -176,6 +177,16 @@ class MainActivity : AppCompatActivity() {
     private fun startWebView() {
         binding.webViewId.loadUrl(fullLink)
         binding.webViewId.settings.javaScriptEnabled = true
+        binding.webViewId.settings.domStorageEnabled = true
+        binding.webViewId.settings.loadWithOverviewMode = true
+
+        binding.webViewId.clearCache(false)
+        binding.webViewId.settings.cacheMode = LOAD_DEFAULT
+
+        binding.webViewId.webChromeClient = ChromeClient()
+
+        CookieManager.getInstance().setAcceptCookie(true)
+        CookieManager.getInstance().setAcceptThirdPartyCookies(binding.webViewId, true)
 
         val linkBot = getSharedPreferences("link", Context.MODE_PRIVATE)
         val localBot = linkBot.getBoolean("local", false)
@@ -186,6 +197,7 @@ class MainActivity : AppCompatActivity() {
         if (!visited) {
             user.edit().putBoolean("hasVisited", true).apply()
             binding.webViewId.webViewClient = object : WebViewClient() {
+
                 override fun onPageFinished(view: WebView?, url: String?) {
                     if (url == "http://localhost/") {
                         linkBot.edit().putBoolean("local", true).apply()
@@ -206,6 +218,25 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+
+    private inner class ChromeClient : WebChromeClient() {
+
+        override fun onProgressChanged(view: WebView?, newProgress: Int) {
+            super.onProgressChanged(view, newProgress)
+        }
+
+        override fun onShowFileChooser(
+            webView: WebView?,
+            filePathCallback: ValueCallback<Array<Uri?>>?,
+            fileChooserParams: FileChooserParams?
+        ): Boolean {
+
+            return true
+        }
+
+
     }
 
     override fun onBackPressed() {

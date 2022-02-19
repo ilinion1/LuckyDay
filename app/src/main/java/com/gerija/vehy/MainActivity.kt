@@ -1,13 +1,14 @@
 package com.gerija.vehy
 
+import android.Manifest
 import android.annotation.SuppressLint
+import android.annotation.TargetApi
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.net.Uri
 import android.os.Bundle
-import android.os.Message
 import android.util.Log
 import android.view.View
 import android.webkit.*
@@ -25,6 +26,33 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.*
+import android.webkit.ValueCallback
+
+import android.webkit.WebViewClient
+
+import android.webkit.WebChromeClient
+
+import android.webkit.WebView
+import android.provider.MediaStore
+
+import android.os.Build
+import android.graphics.Bitmap
+
+import android.content.ClipData
+import java.lang.Exception
+import androidx.core.app.ActivityCompat
+
+import android.content.pm.PackageManager
+
+import androidx.core.content.ContextCompat
+import androidx.core.app.ActivityCompat.startActivityForResult
+
+import android.webkit.WebChromeClient.FileChooserParams
+import android.os.Environment
+import androidx.annotation.RequiresApi
+import java.io.File
+import java.io.IOException
+import java.text.SimpleDateFormat
 
 
 class MainActivity : AppCompatActivity() {
@@ -53,6 +81,12 @@ class MainActivity : AppCompatActivity() {
     private var afId: String? = null
     private var adb: Boolean? = null
 
+    private var uploadMessage: ValueCallback<Uri>? = null
+    private var uploadMessageAboveL: ValueCallback<Array<Uri>>? = null
+
+    companion object {
+        private val FILE_CHOOSER_RESULT_CODE = 10000
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -174,19 +208,19 @@ class MainActivity : AppCompatActivity() {
      * запускаю webView
      */
     @SuppressLint("SetJavaScriptEnabled")
-    private fun startWebView() {
-        binding.webViewId.loadUrl(fullLink)
-        binding.webViewId.settings.javaScriptEnabled = true
-        binding.webViewId.settings.domStorageEnabled = true
-        binding.webViewId.settings.loadWithOverviewMode = true
+    private fun startWebView() = with(binding) {
+        webViewId.loadUrl(fullLink)
+        webViewId.settings.javaScriptEnabled = true
+        webViewId.settings.domStorageEnabled = true
+        webViewId.settings.loadWithOverviewMode = true
 
-        binding.webViewId.clearCache(false)
-        binding.webViewId.settings.cacheMode = LOAD_DEFAULT
+        webViewId.clearCache(false)
+        webViewId.settings.cacheMode = LOAD_DEFAULT
 
-        binding.webViewId.webChromeClient = ChromeClient()
+        webViewId.webChromeClient = ChromeClient()
 
         CookieManager.getInstance().setAcceptCookie(true)
-        CookieManager.getInstance().setAcceptThirdPartyCookies(binding.webViewId, true)
+        CookieManager.getInstance().setAcceptThirdPartyCookies(webViewId, true)
 
         val linkBot = getSharedPreferences("link", Context.MODE_PRIVATE)
         val localBot = linkBot.getBoolean("local", false)
@@ -196,14 +230,14 @@ class MainActivity : AppCompatActivity() {
 
         if (!visited) {
             user.edit().putBoolean("hasVisited", true).apply()
-            binding.webViewId.webViewClient = object : WebViewClient() {
+            webViewId.webViewClient = object : WebViewClient() {
 
                 override fun onPageFinished(view: WebView?, url: String?) {
                     if (url == "http://localhost/") {
                         linkBot.edit().putBoolean("local", true).apply()
                         startActivity(Intent(this@MainActivity, GameActivity::class.java))
                     } else {
-                        binding.webViewId.visibility = View.VISIBLE
+                        webViewId.visibility = View.VISIBLE
                     }
                 }
             }
@@ -211,9 +245,9 @@ class MainActivity : AppCompatActivity() {
             if (localBot) {
                 startActivity(Intent(this@MainActivity, GameActivity::class.java))
             } else {
-                binding.webViewId.webViewClient = object : WebViewClient() {
+                webViewId.webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, url: String?) {
-                        binding.webViewId.visibility = View.VISIBLE
+                        webViewId.visibility = View.VISIBLE
                     }
                 }
             }
@@ -223,26 +257,66 @@ class MainActivity : AppCompatActivity() {
 
     private inner class ChromeClient : WebChromeClient() {
 
-        override fun onProgressChanged(view: WebView?, newProgress: Int) {
-            super.onProgressChanged(view, newProgress)
-        }
-
+        // For Android >= 5.0
         override fun onShowFileChooser(
-            webView: WebView?,
-            filePathCallback: ValueCallback<Array<Uri?>>?,
-            fileChooserParams: FileChooserParams?
+            webView: WebView,
+            filePathCallback: ValueCallback<Array<Uri>>,
+            fileChooserParams: FileChooserParams
         ): Boolean {
-
+            uploadMessageAboveL = filePathCallback
+            openImageChooserActivity()
             return true
         }
-
-
     }
 
-    override fun onBackPressed() {
-        if (binding.webViewId.canGoBack()) {
-            binding.webViewId.goBack()
-        } else super.onBackPressed()
+    private fun openImageChooserActivity() {
+        val i = Intent(Intent.ACTION_GET_CONTENT)
+        i.addCategory(Intent.CATEGORY_OPENABLE)
+        i.type = "image/*"
+        startActivityForResult(Intent.createChooser(i, "Image Chooser"), FILE_CHOOSER_RESULT_CODE)
     }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == FILE_CHOOSER_RESULT_CODE) {
+            if (null == uploadMessage && null == uploadMessageAboveL) return
+            val result = if (data == null || resultCode != Activity.RESULT_OK) null else data.data
+            if (uploadMessageAboveL != null) {
+                onActivityResultAboveL(requestCode, resultCode, data)
+            } else if (uploadMessage != null) {
+                uploadMessage!!.onReceiveValue(result)
+                uploadMessage = null
+            }
+        }
+    }
+
+    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+    private fun onActivityResultAboveL(requestCode: Int, resultCode: Int, intent: Intent?) {
+        if (requestCode != FILE_CHOOSER_RESULT_CODE || uploadMessageAboveL == null)
+            return
+        var results: Array<Uri>? = null
+        if (resultCode == Activity.RESULT_OK) {
+            if (intent != null) {
+                val dataString = intent.dataString
+                val clipData = intent.clipData
+                if (clipData != null) {
+                    results = Array(clipData.itemCount){
+                            i -> clipData.getItemAt(i).uri
+                    }
+                }
+                if (dataString != null)
+                    results = arrayOf(Uri.parse(dataString))
+            }
+        }
+        uploadMessageAboveL!!.onReceiveValue(results)
+        uploadMessageAboveL = null
+    }
+
+
+override fun onBackPressed() {
+    if (binding.webViewId.canGoBack()) {
+        binding.webViewId.goBack()
+    } else super.onBackPressed()
+}
 
 }

@@ -1,6 +1,5 @@
 package com.gerija.vehy
 
-import android.Manifest
 import android.annotation.SuppressLint
 import android.annotation.TargetApi
 import android.app.Activity
@@ -8,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -15,7 +15,6 @@ import android.webkit.*
 import android.webkit.WebSettings.LOAD_DEFAULT
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import com.appsflyer.AppsFlyerConversionListener
 import com.appsflyer.AppsFlyerLib
 import com.facebook.FacebookSdk.fullyInitialize
 import com.facebook.FacebookSdk.setAutoInitEnabled
@@ -26,43 +25,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.*
-import android.webkit.ValueCallback
-
-import android.webkit.WebViewClient
-
-import android.webkit.WebChromeClient
-
-import android.webkit.WebView
-import android.provider.MediaStore
-
-import android.os.Build
-import android.graphics.Bitmap
-
-import android.content.ClipData
-import java.lang.Exception
-import androidx.core.app.ActivityCompat
-
-import android.content.pm.PackageManager
-
-import androidx.core.content.ContextCompat
-import androidx.core.app.ActivityCompat.startActivityForResult
-
-import android.webkit.WebChromeClient.FileChooserParams
-import android.os.Environment
-import android.os.Message
-import androidx.annotation.RequiresApi
-import kotlinx.coroutines.delay
-import java.io.File
-import java.io.IOException
-import java.text.SimpleDateFormat
 
 
 class MainActivity : AppCompatActivity() {
 
     lateinit var binding: ActivityMainBinding
-    private val keyDevAppsflyer = "s2uD2SPSCbdWE7ERtTu9y3"
-
-    //private var webView: WebView? = null
     private var firstLine = ""
     private var secureGetParametr = ""
     private var secureKey = ""
@@ -83,19 +50,18 @@ class MainActivity : AppCompatActivity() {
     private var afId: String? = null
     private var adb: Boolean? = null
 
-    private var uploadMessage: ValueCallback<Uri>? = null
-    private var uploadMessageAboveL: ValueCallback<Array<Uri>>? = null
+
+    private var fileData: ValueCallback<Uri>? = null
+    private var filePath: ValueCallback<Array<Uri>>? = null
 
     companion object {
-        private val FILE_CHOOSER_RESULT_CODE = 10000
+        private const val FILE_CHOOSER_REQUEST_CODE = 10000
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-//        AppsFlyerLib.getInstance().init(keyDevAppsflyer, appsFlyerConversion(), this)
-//        AppsFlyerLib.getInstance().start(this)
         startInitialFb()
         getAppsFlyerParams()
 
@@ -113,41 +79,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-
-
-//    /**
-//     * Обрабатываю данные о конверсиях
-//     */
-//    private fun appsFlyerConversion(): AppsFlyerConversionListener {
-//
-//
-//        return object : AppsFlyerConversionListener {
-//            override fun onConversionDataSuccess(data: MutableMap<String, Any>?) {
-//
-//                data?.let {
-//                    Log.d("MyLog", "$it")
-//                    getAppsFlyerParams(it)
-//
-//                }
-//            }
-//
-//            override fun onConversionDataFail(error: String?) {
-//                source = null
-//                campaignKey = null
-//            }
-//
-//            override fun onAppOpenAttribution(data: MutableMap<String, String>?) {
-//                Log.d("onAttributionFailure", "$data")
-//            }
-//
-//            override fun onAttributionFailure(error: String?) {
-//                Log.d("onAttributionFailure", "$error")
-//                //   conversionLiveData.postValue(mutableMapOf())
-//            }
-//
-//        }
-//    }
-
 
     /**
      * Собираю ссылку
@@ -195,27 +126,19 @@ class MainActivity : AppCompatActivity() {
      */
     private fun getAppsFlyerParams() {
         afId = AppsFlyerLib.getInstance().getAppsFlyerUID(this)
-        Log.d("Log", "1")
-        MyApplication.liveDataAppsFlyer.observe(this){
-            Log.d("Log", "2")
-            for (inform in it) {
-                if (inform.key == "media_source") {
-                    source = inform.value.toString()
-                    Log.d("Log", "$source")
+            MyApplication.liveDataAppsFlyer.observe(this){
+                for (inform in it) {
+                    if (inform.key == "media_source") {
+                        source = inform.value.toString()
+                        Log.d("Log", "$source")
+                    }
+                    if (inform.key == "campaign") {
+                        campaignKey = inform.value.toString()
+                        Log.d("Log", "$campaignKey")
+                    }
                 }
-                if (inform.key == "campaign") {
-                    campaignKey = inform.value.toString()
-                    Log.d("Log", "$campaignKey")
-                }
-            }
-           // setAppSetting()
-            lifecycleScope.launch {
-                setString()
-                delay(2000)
-                startWebView()
-            }
+                setAppSetting()
         }
-
     }
 
 
@@ -224,109 +147,122 @@ class MainActivity : AppCompatActivity() {
      */
     @SuppressLint("SetJavaScriptEnabled")
     private fun startWebView() = with(binding) {
-        webViewId.loadUrl(fullLink)
+        val saveLink = getSharedPreferences("saveLink", Context.MODE_PRIVATE)
+        val linkSaveState = saveLink.getString("saveLink", "")
+        if (linkSaveState.isNullOrEmpty()){
+            webViewId.loadUrl(fullLink)
+        } else{
+            webViewId.loadUrl(linkSaveState)
+        }
+
         webViewId.settings.javaScriptEnabled = true
         webViewId.settings.domStorageEnabled = true
         webViewId.settings.loadWithOverviewMode = true
-        webViewId.visibility = View.VISIBLE
 
-//        webViewId.clearCache(false)
-//        webViewId.settings.cacheMode = LOAD_DEFAULT
+        webViewId.clearCache(false)
+        webViewId.settings.cacheMode = LOAD_DEFAULT
 
-        //webViewId.webChromeClient = ChromeClient()
+        webViewId.webChromeClient = ChromeClient()
 
-//        CookieManager.getInstance().setAcceptCookie(true)
-//        CookieManager.getInstance().setAcceptThirdPartyCookies(webViewId, true)
+        CookieManager.getInstance().setAcceptCookie(true)
+        CookieManager.getInstance().setAcceptThirdPartyCookies(webViewId, true)
 
-//        val linkBot = getSharedPreferences("link", Context.MODE_PRIVATE)
-//        val localBot = linkBot.getBoolean("local", false)
-//
-//        val user = getSharedPreferences("hasVisited", Context.MODE_PRIVATE)
-//        val visited = user.getBoolean("hasVisited", false)
+        val linkBot = getSharedPreferences("link", Context.MODE_PRIVATE)
+        val localBot = linkBot.getBoolean("local", false)
 
-//        if (!visited) {
-//            user.edit().putBoolean("hasVisited", true).apply()
-//            webViewId.webViewClient = object : WebViewClient() {
-//
-//                override fun onPageFinished(view: WebView?, url: String?) {
-//                    if (url == "http://localhost/") {
-//                        linkBot.edit().putBoolean("local", true).apply()
-//                        startActivity(Intent(this@MainActivity, GameActivity::class.java))
-//                    } else {
-//                        webViewId.visibility = View.VISIBLE
-//                    }
-//                }
-//            }
-//        } else {
-//            if (localBot) {
-//                startActivity(Intent(this@MainActivity, GameActivity::class.java))
-//            } else {
-//                webViewId.webViewClient = object : WebViewClient() {
-//                    override fun onPageFinished(view: WebView?, url: String?) {
-//                        webViewId.visibility = View.VISIBLE
-//                    }
-//                }
-//            }
-//        }
+        val user = getSharedPreferences("hasVisited", Context.MODE_PRIVATE)
+        val visited = user.getBoolean("hasVisited", false)
+
+
+        if (!visited) {
+            user.edit().putBoolean("hasVisited", true).apply()
+            webViewId.webViewClient = object : WebViewClient() {
+
+                override fun onPageFinished(view: WebView?, url: String?) {
+                    saveLink.edit().putString("saveLink", url).apply()
+                    if (url == "http://localhost/") {
+
+                        linkBot.edit().putBoolean("local", true).apply()
+                        startActivity(Intent(this@MainActivity, GameActivity::class.java))
+                    } else {
+
+                        webViewId.visibility = View.VISIBLE
+                    }
+                }
+            }
+        } else {
+
+                if (localBot) {
+
+                    startActivity(Intent(this@MainActivity, GameActivity::class.java))
+                } else {
+
+                    webViewId.webViewClient = object : WebViewClient() {
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            webViewId.visibility = View.VISIBLE
+                        }
+                    }
+                }
+        }
     }
 
 
-//    private inner class ChromeClient : WebChromeClient() {
-//
-//        // For Android >= 5.0
-//        override fun onShowFileChooser(
-//            webView: WebView,
-//            filePathCallback: ValueCallback<Array<Uri>>,
-//            fileChooserParams: FileChooserParams
-//        ): Boolean {
-//            uploadMessageAboveL = filePathCallback
-//            openImageChooserActivity()
-//            return true
-//        }
-//    }
+    private inner class ChromeClient : WebChromeClient() {
 
-//    private fun openImageChooserActivity() {
-//        val i = Intent(Intent.ACTION_GET_CONTENT)
-//        i.addCategory(Intent.CATEGORY_OPENABLE)
-//        i.type = "image/*"
-//        startActivityForResult(Intent.createChooser(i, "Image Chooser"), FILE_CHOOSER_RESULT_CODE)
-//    }
+        // For Android >= 5.0
+        override fun onShowFileChooser(
+            webView: WebView,
+            filePathCallback: ValueCallback<Array<Uri>>,
+            fileChooserParams: FileChooserParams
+        ): Boolean {
+            filePath = filePathCallback
+            openImageChooserActivity()
+            return true
+        }
+    }
 
-//    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-//        super.onActivityResult(requestCode, resultCode, data)
-//        if (requestCode == FILE_CHOOSER_RESULT_CODE) {
-//            if (null == uploadMessage && null == uploadMessageAboveL) return
-//            val result = if (data == null || resultCode != Activity.RESULT_OK) null else data.data
-//            if (uploadMessageAboveL != null) {
-//                onActivityResultAboveL(requestCode, resultCode, data)
-//            } else if (uploadMessage != null) {
-//                uploadMessage!!.onReceiveValue(result)
-//                uploadMessage = null
-//            }
-//        }
-//    }
+    private fun openImageChooserActivity() {
+        val i = Intent(Intent.ACTION_GET_CONTENT)
+        i.addCategory(Intent.CATEGORY_OPENABLE)
+        i.type = "image/*"
+        startActivityForResult(i, FILE_CHOOSER_REQUEST_CODE)
+    }
 
-//    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-//    private fun onActivityResultAboveL(requestCode: Int, resultCode: Int, intent: Intent?) {
-//        if (requestCode != FILE_CHOOSER_RESULT_CODE || uploadMessageAboveL == null)
-//            return
-//        var results: Array<Uri>? = null
-//        if (resultCode == Activity.RESULT_OK) {
-//            if (intent != null) {
-//                val dataString = intent.dataString
-//                val clipData = intent.clipData
-//                if (clipData != null) {
-//                    results = Array(clipData.itemCount){
-//                            i -> clipData.getItemAt(i).uri
-//                    }
-//                }
-//                if (dataString != null)
-//                    results = arrayOf(Uri.parse(dataString))
-//            }
-//        }
-//        uploadMessageAboveL!!.onReceiveValue(results)
-//        uploadMessageAboveL = null
-//    }
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == FILE_CHOOSER_REQUEST_CODE) {
+            if (null == fileData && null == filePath) return
+            val result = if (data == null || resultCode != Activity.RESULT_OK) null else data.data
+            if (filePath != null) {
+                onActivityResultAboveL(requestCode, resultCode, data)
+            } else if (fileData != null) {
+                fileData!!.onReceiveValue(result)
+                fileData = null
+            }
+        }
+    }
+
+    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+    private fun onActivityResultAboveL(requestCode: Int, resultCode: Int, intent: Intent?) {
+        if (requestCode != FILE_CHOOSER_REQUEST_CODE || filePath == null)
+            return
+        var results: Array<Uri>? = null
+        if (resultCode == Activity.RESULT_OK) {
+            if (intent != null) {
+                val dataString = intent.dataString
+                val clipData = intent.clipData
+                if (clipData != null) {
+                    results = Array(clipData.itemCount){
+                            i -> clipData.getItemAt(i).uri
+                    }
+                }
+                if (dataString != null)
+                    results = arrayOf(Uri.parse(dataString))
+            }
+        }
+        filePath!!.onReceiveValue(results)
+        filePath = null
+    }
 
 
 override fun onBackPressed() {

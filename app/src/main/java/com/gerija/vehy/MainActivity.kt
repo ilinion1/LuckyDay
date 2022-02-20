@@ -49,7 +49,9 @@ import androidx.core.app.ActivityCompat.startActivityForResult
 
 import android.webkit.WebChromeClient.FileChooserParams
 import android.os.Environment
+import android.os.Message
 import androidx.annotation.RequiresApi
+import kotlinx.coroutines.delay
 import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -92,9 +94,10 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        AppsFlyerLib.getInstance().init(keyDevAppsflyer, appsFlyerConversion(), this)
-        AppsFlyerLib.getInstance().start(this)
+//        AppsFlyerLib.getInstance().init(keyDevAppsflyer, appsFlyerConversion(), this)
+//        AppsFlyerLib.getInstance().start(this)
         startInitialFb()
+        getAppsFlyerParams()
 
     }
 
@@ -112,37 +115,38 @@ class MainActivity : AppCompatActivity() {
     }
 
 
-    /**
-     * Обрабатываю данные о конверсиях
-     */
-    private fun appsFlyerConversion(): AppsFlyerConversionListener {
-        afId = AppsFlyerLib.getInstance().getAppsFlyerUID(this)
-
-        return object : AppsFlyerConversionListener {
-            override fun onConversionDataSuccess(data: MutableMap<String, Any>?) {
-
-                data?.let {
-                    getAppsFlyerParams(it)
-
-                }
-            }
-
-            override fun onConversionDataFail(error: String?) {
-                source = null
-                campaignKey = null
-            }
-
-            override fun onAppOpenAttribution(data: MutableMap<String, String>?) {
-                Log.d("onAttributionFailure", "$data")
-            }
-
-            override fun onAttributionFailure(error: String?) {
-                Log.d("onAttributionFailure", "$error")
-                //   conversionLiveData.postValue(mutableMapOf())
-            }
-
-        }
-    }
+//    /**
+//     * Обрабатываю данные о конверсиях
+//     */
+//    private fun appsFlyerConversion(): AppsFlyerConversionListener {
+//
+//
+//        return object : AppsFlyerConversionListener {
+//            override fun onConversionDataSuccess(data: MutableMap<String, Any>?) {
+//
+//                data?.let {
+//                    Log.d("MyLog", "$it")
+//                    getAppsFlyerParams(it)
+//
+//                }
+//            }
+//
+//            override fun onConversionDataFail(error: String?) {
+//                source = null
+//                campaignKey = null
+//            }
+//
+//            override fun onAppOpenAttribution(data: MutableMap<String, String>?) {
+//                Log.d("onAttributionFailure", "$data")
+//            }
+//
+//            override fun onAttributionFailure(error: String?) {
+//                Log.d("onAttributionFailure", "$error")
+//                //   conversionLiveData.postValue(mutableMapOf())
+//            }
+//
+//        }
+//    }
 
 
     /**
@@ -189,18 +193,29 @@ class MainActivity : AppCompatActivity() {
     /**
      * Получаю параметры с AppsFlyer
      */
-    private fun getAppsFlyerParams(data: MutableMap<String, Any>) {
-        for (inform in data) {
-            if (inform.key == "media_source") {
-                source = inform.value.toString()
-                Log.d("Log", "$source")
+    private fun getAppsFlyerParams() {
+        afId = AppsFlyerLib.getInstance().getAppsFlyerUID(this)
+        Log.d("Log", "1")
+        MyApplication.liveDataAppsFlyer.observe(this){
+            Log.d("Log", "2")
+            for (inform in it) {
+                if (inform.key == "media_source") {
+                    source = inform.value.toString()
+                    Log.d("Log", "$source")
+                }
+                if (inform.key == "campaign") {
+                    campaignKey = inform.value.toString()
+                    Log.d("Log", "$campaignKey")
+                }
             }
-            if (inform.key == "campaign") {
-                campaignKey = inform.value.toString()
-                Log.d("Log", "$campaignKey")
+           // setAppSetting()
+            lifecycleScope.launch {
+                setString()
+                delay(2000)
+                startWebView()
             }
         }
-        setAppSetting()
+
     }
 
 
@@ -213,104 +228,105 @@ class MainActivity : AppCompatActivity() {
         webViewId.settings.javaScriptEnabled = true
         webViewId.settings.domStorageEnabled = true
         webViewId.settings.loadWithOverviewMode = true
+        webViewId.visibility = View.VISIBLE
 
-        webViewId.clearCache(false)
-        webViewId.settings.cacheMode = LOAD_DEFAULT
+//        webViewId.clearCache(false)
+//        webViewId.settings.cacheMode = LOAD_DEFAULT
 
-        webViewId.webChromeClient = ChromeClient()
+        //webViewId.webChromeClient = ChromeClient()
 
-        CookieManager.getInstance().setAcceptCookie(true)
-        CookieManager.getInstance().setAcceptThirdPartyCookies(webViewId, true)
+//        CookieManager.getInstance().setAcceptCookie(true)
+//        CookieManager.getInstance().setAcceptThirdPartyCookies(webViewId, true)
 
-        val linkBot = getSharedPreferences("link", Context.MODE_PRIVATE)
-        val localBot = linkBot.getBoolean("local", false)
+//        val linkBot = getSharedPreferences("link", Context.MODE_PRIVATE)
+//        val localBot = linkBot.getBoolean("local", false)
+//
+//        val user = getSharedPreferences("hasVisited", Context.MODE_PRIVATE)
+//        val visited = user.getBoolean("hasVisited", false)
 
-        val user = getSharedPreferences("hasVisited", Context.MODE_PRIVATE)
-        val visited = user.getBoolean("hasVisited", false)
-
-        if (!visited) {
-            user.edit().putBoolean("hasVisited", true).apply()
-            webViewId.webViewClient = object : WebViewClient() {
-
-                override fun onPageFinished(view: WebView?, url: String?) {
-                    if (url == "http://localhost/") {
-                        linkBot.edit().putBoolean("local", true).apply()
-                        startActivity(Intent(this@MainActivity, GameActivity::class.java))
-                    } else {
-                        webViewId.visibility = View.VISIBLE
-                    }
-                }
-            }
-        } else {
-            if (localBot) {
-                startActivity(Intent(this@MainActivity, GameActivity::class.java))
-            } else {
-                webViewId.webViewClient = object : WebViewClient() {
-                    override fun onPageFinished(view: WebView?, url: String?) {
-                        webViewId.visibility = View.VISIBLE
-                    }
-                }
-            }
-        }
+//        if (!visited) {
+//            user.edit().putBoolean("hasVisited", true).apply()
+//            webViewId.webViewClient = object : WebViewClient() {
+//
+//                override fun onPageFinished(view: WebView?, url: String?) {
+//                    if (url == "http://localhost/") {
+//                        linkBot.edit().putBoolean("local", true).apply()
+//                        startActivity(Intent(this@MainActivity, GameActivity::class.java))
+//                    } else {
+//                        webViewId.visibility = View.VISIBLE
+//                    }
+//                }
+//            }
+//        } else {
+//            if (localBot) {
+//                startActivity(Intent(this@MainActivity, GameActivity::class.java))
+//            } else {
+//                webViewId.webViewClient = object : WebViewClient() {
+//                    override fun onPageFinished(view: WebView?, url: String?) {
+//                        webViewId.visibility = View.VISIBLE
+//                    }
+//                }
+//            }
+//        }
     }
 
 
-    private inner class ChromeClient : WebChromeClient() {
+//    private inner class ChromeClient : WebChromeClient() {
+//
+//        // For Android >= 5.0
+//        override fun onShowFileChooser(
+//            webView: WebView,
+//            filePathCallback: ValueCallback<Array<Uri>>,
+//            fileChooserParams: FileChooserParams
+//        ): Boolean {
+//            uploadMessageAboveL = filePathCallback
+//            openImageChooserActivity()
+//            return true
+//        }
+//    }
 
-        // For Android >= 5.0
-        override fun onShowFileChooser(
-            webView: WebView,
-            filePathCallback: ValueCallback<Array<Uri>>,
-            fileChooserParams: FileChooserParams
-        ): Boolean {
-            uploadMessageAboveL = filePathCallback
-            openImageChooserActivity()
-            return true
-        }
-    }
+//    private fun openImageChooserActivity() {
+//        val i = Intent(Intent.ACTION_GET_CONTENT)
+//        i.addCategory(Intent.CATEGORY_OPENABLE)
+//        i.type = "image/*"
+//        startActivityForResult(Intent.createChooser(i, "Image Chooser"), FILE_CHOOSER_RESULT_CODE)
+//    }
 
-    private fun openImageChooserActivity() {
-        val i = Intent(Intent.ACTION_GET_CONTENT)
-        i.addCategory(Intent.CATEGORY_OPENABLE)
-        i.type = "image/*"
-        startActivityForResult(Intent.createChooser(i, "Image Chooser"), FILE_CHOOSER_RESULT_CODE)
-    }
+//    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+//        super.onActivityResult(requestCode, resultCode, data)
+//        if (requestCode == FILE_CHOOSER_RESULT_CODE) {
+//            if (null == uploadMessage && null == uploadMessageAboveL) return
+//            val result = if (data == null || resultCode != Activity.RESULT_OK) null else data.data
+//            if (uploadMessageAboveL != null) {
+//                onActivityResultAboveL(requestCode, resultCode, data)
+//            } else if (uploadMessage != null) {
+//                uploadMessage!!.onReceiveValue(result)
+//                uploadMessage = null
+//            }
+//        }
+//    }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == FILE_CHOOSER_RESULT_CODE) {
-            if (null == uploadMessage && null == uploadMessageAboveL) return
-            val result = if (data == null || resultCode != Activity.RESULT_OK) null else data.data
-            if (uploadMessageAboveL != null) {
-                onActivityResultAboveL(requestCode, resultCode, data)
-            } else if (uploadMessage != null) {
-                uploadMessage!!.onReceiveValue(result)
-                uploadMessage = null
-            }
-        }
-    }
-
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-    private fun onActivityResultAboveL(requestCode: Int, resultCode: Int, intent: Intent?) {
-        if (requestCode != FILE_CHOOSER_RESULT_CODE || uploadMessageAboveL == null)
-            return
-        var results: Array<Uri>? = null
-        if (resultCode == Activity.RESULT_OK) {
-            if (intent != null) {
-                val dataString = intent.dataString
-                val clipData = intent.clipData
-                if (clipData != null) {
-                    results = Array(clipData.itemCount){
-                            i -> clipData.getItemAt(i).uri
-                    }
-                }
-                if (dataString != null)
-                    results = arrayOf(Uri.parse(dataString))
-            }
-        }
-        uploadMessageAboveL!!.onReceiveValue(results)
-        uploadMessageAboveL = null
-    }
+//    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+//    private fun onActivityResultAboveL(requestCode: Int, resultCode: Int, intent: Intent?) {
+//        if (requestCode != FILE_CHOOSER_RESULT_CODE || uploadMessageAboveL == null)
+//            return
+//        var results: Array<Uri>? = null
+//        if (resultCode == Activity.RESULT_OK) {
+//            if (intent != null) {
+//                val dataString = intent.dataString
+//                val clipData = intent.clipData
+//                if (clipData != null) {
+//                    results = Array(clipData.itemCount){
+//                            i -> clipData.getItemAt(i).uri
+//                    }
+//                }
+//                if (dataString != null)
+//                    results = arrayOf(Uri.parse(dataString))
+//            }
+//        }
+//        uploadMessageAboveL!!.onReceiveValue(results)
+//        uploadMessageAboveL = null
+//    }
 
 
 override fun onBackPressed() {
